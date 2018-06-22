@@ -24,6 +24,17 @@ pip install -r ../requirements.txt
 
 ## Step 3: AWS credentials
 
+```
+https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html
+```
+```
+$ aws configure --profile user2
+AWS Access Key ID [None]: AKIAI44QH8DHBEXAMPLE
+AWS Secret Access Key [None]: je7MtGbClwBF/2Zp9Utk/h3yCo8nvbEXAMPLEKEY
+Default region name [None]: us-east-1
+Default output format [None]: text
+```
+
 Get your public/private access key from AWS console and fill them in
 
 ```
@@ -77,7 +88,7 @@ You can configure to use different region, zone, instance type by setting proper
 
 ```
 export AWS_DEFAULT_REGION=us-east-1
-launch.py --zone=us-east-1a --instance-type=p3.16xlarge
+launch.py --zone=us-east-1a --instance=p3.16xlarge
 ```
 
 You can also provide custom AMI. When doing this, make sure that "linux-type" argument is set properly because that determines the username that is used to SSH into the instance to finish setup. Linux type `amazon` uses username `ec2-user` and linux type `ubuntu` uses username `ubuntu`.
