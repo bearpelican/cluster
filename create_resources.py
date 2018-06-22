@@ -228,7 +228,7 @@ def placement_group_setup(group_name):
   
 def create_resources():
 
-  region = os.environ['AWS_DEFAULT_REGION']
+  region = u.get_region()
   print("Creating %s resources in region %s"%(DEFAULT_NAME, region,))
 
   vpc, security_group = network_setup()

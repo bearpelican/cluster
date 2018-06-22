@@ -100,10 +100,13 @@ def format_task_name(task_id, role, run):
 def make_name(name):
   return [{'Key': 'Name', 'Value': name}]
 
+def get_session(profile_name='gpubox'):
+  return boto3.Session(profile_name=profile_name)
 
 def get_region():
-  assert 'AWS_DEFAULT_REGION' in os.environ, "Must specify AWS_DEFAULT_REGION environment variable, ie 'export AWS_DEFAULT_REGION=us-west-2'"
-  return os.environ['AWS_DEFAULT_REGION']
+  # assert 'AWS_DEFAULT_REGION' in os.environ, "Must specify AWS_DEFAULT_REGION environment variable, ie 'export AWS_DEFAULT_REGION=us-west-2'"
+  # return os.environ['AWS_DEFAULT_REGION']
+  return get_session().region_name
 
 def get_keypair_name():
   """Returns keypair name to use for current region and user."""
@@ -114,17 +117,17 @@ def get_keypair_name():
   return u.get_resource_name() +'-'+username
 
 def create_ec2_client():
-  REGION = os.environ['AWS_DEFAULT_REGION']
+  REGION = get_region()
   return boto3.client('ec2', region_name=REGION)
 
 
 def create_efs_client():
-  REGION = os.environ['AWS_DEFAULT_REGION']
+  REGION = get_region()
   return boto3.client('efs', region_name=REGION)
 
 
 def create_ec2_resource():
-  REGION = os.environ['AWS_DEFAULT_REGION']
+  REGION = get_region()
   return boto3.resource('ec2',region_name=REGION)
 
 
@@ -476,7 +479,7 @@ def get_keypair_fn(keypair_name):
   """Generate canonical location for .pem file for given keypair and
   default region."""
   return "%s/%s-%s.pem" % (os.environ["HOME"], keypair_name,
-                           os.environ['AWS_DEFAULT_REGION'],)
+                           get_region(),)
 
 class SshClient:
   def __init__(self,
