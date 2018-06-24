@@ -44,9 +44,8 @@ def validate_resource_name(name):
   # disallow unicode names to avoid pain
   assert resource_regexp.match(name)
 
-def get_resource_name():
+def get_resource_name(default='as_nexus'):
   """Gives global default name for singleton AWS resources (VPC name, keypair name, etc)."""
-  default = 'nexus'
   name =os.environ.get('RESOURCE_NAME', default)
   if name != default:
     validate_resource_name(name)
@@ -117,18 +116,15 @@ def get_keypair_name():
   return u.get_resource_name() +'-'+username
 
 def create_ec2_client():
-  REGION = get_region()
-  return boto3.client('ec2', region_name=REGION)
+  return get_session().client('ec2')
 
 
 def create_efs_client():
-  REGION = get_region()
-  return boto3.client('efs', region_name=REGION)
+  return get_session().client('efs')
 
 
 def create_ec2_resource():
-  REGION = get_region()
-  return boto3.resource('ec2',region_name=REGION)
+  return get_session().resource('ec2')
 
 
 def is_good_response(response):
