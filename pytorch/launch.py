@@ -68,8 +68,7 @@ def main():
   job.upload('distributed.py')
   job.upload('multiproc.py')
   job.upload('train_nv.py')
-#   job.upload('train_nv.sh')
-#   job.run_async('bash train_nv.sh --logdir=%s'%(logdir,))
+  # job.run_async('python train_nv.py ~/mount_point/raw-data --batch-size=128 --logdir=%s'%(logdir,))
 
 
 if __name__=='__main__':
