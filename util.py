@@ -44,7 +44,7 @@ def validate_resource_name(name):
   # disallow unicode names to avoid pain
   assert resource_regexp.match(name)
 
-def get_resource_name(default='as_nexus'):
+def get_resource_name(default='nexus'):
   """Gives global default name for singleton AWS resources (VPC name, keypair name, etc)."""
   name =os.environ.get('RESOURCE_NAME', default)
   if name != default:
@@ -99,7 +99,7 @@ def format_task_name(task_id, role, run):
 def make_name(name):
   return [{'Key': 'Name', 'Value': name}]
 
-def get_session(profile_name='gpubox'):
+def get_session(profile_name='diux'):
   return boto3.Session(profile_name=profile_name)
 
 def get_region():

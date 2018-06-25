@@ -21,9 +21,9 @@ import models
 from distributed import DistributedDataParallel as DDP
 from datetime import datetime
 
-model_names = sorted(name for name in models.__dict__
-                     if name.islower() and not name.startswith("__")
-                     and callable(models.__dict__[name]))
+# model_names = sorted(name for name in models.__dict__
+#                      if name.islower() and not name.startswith("__")
+#                      and callable(models.__dict__[name]))
 # print(model_names)
 
 def get_parser():
@@ -32,11 +32,11 @@ def get_parser():
     parser.add_argument('--warmonly', action='store_true', help='Just 1 epoch of each size')
     parser.add_argument('--save-dir', type=str, default=Path.home()/'imagenet_training',
                         help='Directory to save logs and models.')
-    parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet18',
-                        choices=model_names,
-                        help='model architecture: ' +
-                        ' | '.join(model_names) +
-                        ' (default: resnet18)')
+    # parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet18',
+    #                     choices=model_names,
+    #                     help='model architecture: ' +
+    #                     ' | '.join(model_names) +
+    #                     ' (default: resnet18)')
     parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
     parser.add_argument('--epochs', default=90, type=int, metavar='N',
@@ -227,8 +227,11 @@ def main():
         torch.cuda.set_device(args.gpu)
         dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url, world_size=args.world_size)
 
-    if args.pretrained: model = models.__dict__[args.arch](pretrained=True)
-    else:               model = models.__dict__[args.arch]()
+    
+    # if args.pretrained: model = models.__dict__[args.arch](pretrained=True)
+    # else:               model = models.__dict__[args.arch]()
+    import resnet
+    model = resnet.resnet50()
 
     model = model.cuda()
     if args.distributed: model = DDP(model)

@@ -27,6 +27,7 @@ def get_parser():
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
     parser.add_argument('data', metavar='DIR', help='path to dataset')
     parser.add_argument('--save-dir', type=str, default=Path.cwd(), help='Directory to save logs and models.')
+    parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet50')
     # parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet18',
     #                     choices=model_names,
     #                     help='model architecture: ' +

@@ -37,6 +37,7 @@ class Run(backend.Run):
     self.name = name
     self.kwargs = kwargs
     self.jobs = []
+    self.instances = []
 
   # TODO: get rid of linux type (only login username)
   def make_job(self, role_name, num_tasks=1, **kwargs):
@@ -115,7 +116,7 @@ class Run(backend.Run):
             self.log("create_tags failed with %s, retrying in %d seconds"%(
               str(e), TIMEOUT_SEC))
             time.sleep(TIMEOUT_SEC)
-
+    self.instances = instances
     job = Job(self, job_name, instances=instances,
               install_script=install_script,
               linux_type=linux_type,

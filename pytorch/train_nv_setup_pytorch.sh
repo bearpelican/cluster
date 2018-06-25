@@ -22,13 +22,15 @@ bash Anaconda3-5.0.1-Linux-x86_64.sh -b
 conda install pytorch torchvision cuda91 -c pytorch -y
 
 # we should customize this to pytorch only
-cd
+echo ". $HOME/miniconda3/etc/profile.d/conda.sh" >> ~/.bashrc
+# echo 'export PATH=~/anaconda3/bin:$PATH' >> ~/.bashrc
+# export PATH=~/anaconda3/bin:$PATH
+source ~/.bashrc
+
+# fastai?
 git clone https://github.com/fastai/fastai.git
 cd fastai/
-echo 'export PATH=~/anaconda3/bin:$PATH' >> ~/.bashrc
-export PATH=~/anaconda3/bin:$PATH
-source ~/.bashrc
 conda env update
 echo 'source activate fastai' >> ~/.bashrc
-source activate fastai
+conda activate fastai
 source ~/.bashrc

@@ -26,7 +26,8 @@ parser.add_argument('--group', type=str, default='dawn_runs',
                      help="name of the current run")
 parser.add_argument('--name', type=str, default='pytorch_test',
                      help="name of the current run")
-parser.add_argument('--instance-type', type=str, default='p3.2xlarge',
+# parser.add_argument('--instance-type', type=str, default='p3.2xlarge',
+parser.add_argument('--instance-type', type=str, default='t2.large',
                      help="type of instance")
 parser.add_argument('--zone', type=str, default='us-west-2a',
                     help='which availability zone to use')
@@ -35,6 +36,16 @@ parser.add_argument('--linux-type', type=str, default='ubuntu',
 parser.add_argument('--role', type=str, default='launcher',
                     help='launcher or worker')
 args = parser.parse_args()
+
+
+def attach_imagnet_ebs(aws_instance, job, tag='imagenet_high_perf'):
+  ec2 = u.create_ec2_client()
+  v = list(ec2.volumes.filter(Filters=[{'Name':'tag:Name', 'Values':['imagenet_high_perf']}]).all())[0]
+  v.detach_from_instance()
+  v.attach_to_instance(InstanceId=aws_instance.id, Device='/dev/xvdf')
+  job.run('sudo mkdir mount_point')
+  job.run('sudo mount /dev/xvdf mount_point')
+  
 
 def main():
   import aws_backend
@@ -45,6 +56,8 @@ def main():
   job = run.make_job('pytorch', instance_type=args.instance_type)
   job.wait_until_ready()
   print(job.connect_instructions)
+
+  attach_imagnet_ebs(run.instances[0])
   
 
   # tensorboard stuff
@@ -63,12 +76,19 @@ def main():
 #   run pytorch
   job.run('source activate pytorch_p36')
   job.run('killall python || echo failed')  # kill previous run
+
+  # upload files
   job.upload('resnet.py')
-  job.upload('fp16util.py')
   job.upload('distributed.py')
   job.upload('multiproc.py')
-  job.upload('train_nv.py')
-  # job.run_async('python train_nv.py ~/mount_point/raw-data --batch-size=128 --logdir=%s'%(logdir,))
+  job.upload('train_imagenet_fastai.py')
+  job.upload('setup_env_fastai.sh')
+
+  # run setup script
+  job.run('./setup_env_fastai.sh')
+
+  # run training
+  job.run_async('python train_imagenet_fastai.py ~/mount_point/raw-data --batch-size=128 --logdir=%s'%(logdir,))
 
 
 if __name__=='__main__':

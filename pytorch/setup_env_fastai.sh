@@ -57,32 +57,27 @@ SAVE_DIR=~/$PROJECT
 mkdir $SAVE_DIR
 
 echo "$(date '+%Y-%m-%d-%H-%M-%S') Instance loaded. Updating projects." |& tee -a $SAVE_DIR/script.log
+git clone git@github.com:fastai/fastai.git
 cd ~/fastai
-git stash
-git pull
-git stash pop
-SHELL=/bin/bash
-source ~/anaconda3/bin/activate fastai && conda env update -f=environment.yml
+conda env update fastai
 ln -s ~/fastai/fastai ~/anaconda3/envs/fastai/lib/python3.6/site-packages
-cd ~/git/imagenet-fast/imagenet_nv
-git pull
-git checkout custom_script
 
-cd ~/data/imagenet
-bash ~/git/imagenet-fast/aws/upload_scripts/blacklist.sh
-cd ../imagenet-sz/160/
-bash ~/git/imagenet-fast/aws/upload_scripts/blacklist.sh
-cd ../320/
-bash ~/git/imagenet-fast/aws/upload_scripts/blacklist.sh
+# cd ~/data/imagenet
+# bash ~/git/imagenet-fast/aws/upload_scripts/blacklist.sh
+# cd ../imagenet-sz/160/
+# bash ~/git/imagenet-fast/aws/upload_scripts/blacklist.sh
+# cd ../320/
+# bash ~/git/imagenet-fast/aws/upload_scripts/blacklist.sh
 
-cd ~/data/imagenet/val
-cp -r --parents */*1.JPEG ../val2/
-cd ~/data/imagenet-sz/160/val
-mkdir ../val2
-cp -r --parents */*1.JPEG ../val2/
-cd ~/data/imagenet-sz/320/val
-mkdir ../val2
-cp -r --parents */*1.JPEG ../val2/
+# cd ~/data/imagenet/val
+# cp -r --parents */*1.JPEG ../val2/
+# cd ~/data/imagenet-sz/160/val
+# mkdir ../val2
+# cp -r --parents */*1.JPEG ../val2/
+# cd ~/data/imagenet-sz/320/val
+# mkdir ../val2
+# cp -r --parents */*1.JPEG ../val2/
+
 
 cd ~/git/imagenet-fast/imagenet_nv
 echo "$(date '+%Y-%m-%d-%H-%M-%S') Warming up volume." |& tee -a $SAVE_DIR/script.log
