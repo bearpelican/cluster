@@ -97,7 +97,8 @@ echo "$(date '+%Y-%m-%d-%H-%M-%S') Imagenet training finished." |& tee -a $SAVE_
 
 mv *.log $SAVE_DIR
 mv *.tar $SAVE_DIR
-scp -o StrictHostKeyChecking=no -r $SAVE_DIR ubuntu@aws-m5.mine.nu:~/data/imagenet_training
+# move to mounted volume?
+# scp -o StrictHostKeyChecking=no -r $SAVE_DIR ubuntu@aws-m5.mine.nu:~/data/imagenet_training
 
 if [[ -n "$SHUTDOWN" ]]; then
     echo Done. Shutting instance down

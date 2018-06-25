@@ -14,24 +14,24 @@ import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-import models
+# import models
 from distributed import DistributedDataParallel as DDP
 from fp16util import network_to_half, set_grad, copy_in_params
 
-model_names = sorted(name for name in models.__dict__
-                     if name.islower() and not name.startswith("__")
-                     and callable(models.__dict__[name]))
+# model_names = sorted(name for name in models.__dict__
+#                      if name.islower() and not name.startswith("__")
+#                      and callable(models.__dict__[name]))
 #print(model_names)
 
 def get_parser():
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
     parser.add_argument('data', metavar='DIR', help='path to dataset')
     parser.add_argument('--save-dir', type=str, default=Path.cwd(), help='Directory to save logs and models.')
-    parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet18',
-                        choices=model_names,
-                        help='model architecture: ' +
-                        ' | '.join(model_names) +
-                        ' (default: resnet18)')
+    # parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet18',
+    #                     choices=model_names,
+    #                     help='model architecture: ' +
+    #                     ' | '.join(model_names) +
+    #                     ' (default: resnet18)')
     parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
     parser.add_argument('--epochs', default=90, type=int, metavar='N',
@@ -118,8 +118,13 @@ def main():
     if args.fp16: assert torch.backends.cudnn.enabled, "fp16 mode requires cudnn backend to be enabled."
 
     # create model
-    if args.pretrained: model = models.__dict__[args.arch](pretrained=True)
-    else: model = models.__dict__[args.arch]()
+    # if args.pretrained: model = models.__dict__[args.arch](pretrained=True)
+    # else: model = models.__dict__[args.arch]()
+    # AS: force use resnet50 for now, until we figure out whether to upload model directory
+    import resnet
+    model = resnet.resnet50()
+
+    print("Loaded model")
 
     model = model.cuda()
     n_dev = torch.cuda.device_count()
@@ -138,6 +143,8 @@ def main():
     # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda()
     optimizer = torch.optim.SGD(param_copy, args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+
+    print("Defined loss and optimizer")
 
     best_prec1 = 0
     # optionally resume from a checkpoint
@@ -163,6 +170,9 @@ def main():
 
     if args.evaluate: return validate(val_loader, model, criterion, epoch, start_time)
 
+    print("Created data loaders")
+
+    print("Begin training")
     for epoch in range(args.start_epoch, args.epochs):
         adjust_learning_rate(optimizer, epoch)
         if epoch==int(args.epochs*0.4+0.5):
