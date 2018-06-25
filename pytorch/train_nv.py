@@ -159,11 +159,11 @@ def main():
 
     if args.small:
         traindir = os.path.join(args.data+'-sz/160', 'train')
-        valdir = os.path.join(args.data+'-sz/160', 'val')
+        valdir = os.path.join(args.data+'-sz/160', 'validation')
         args.sz = 128
     else:
         traindir = os.path.join(args.data, 'train')
-        valdir = os.path.join(args.data, 'val')
+        valdir = os.path.join(args.data, 'validation')
         args.sz = 224
 
     train_loader,val_loader,train_sampler,val_sampler = get_loaders(traindir, valdir, use_val_sampler=True)
@@ -177,7 +177,7 @@ def main():
         adjust_learning_rate(optimizer, epoch)
         if epoch==int(args.epochs*0.4+0.5):
             traindir = os.path.join(args.data, 'train')
-            valdir = os.path.join(args.data, 'val')
+            valdir = os.path.join(args.data, 'validation')
             args.sz = 224
             train_loader,val_loader,train_sampler,val_sampler = get_loaders( traindir, valdir)
         if epoch==int(args.epochs*0.92+0.5):
