@@ -159,6 +159,7 @@ class Task(backend.Task):
     self.job = job
     self.id = task_id
     self.install_script = install_script
+    self.user_data = user_data
     self._run_counter = 0
     self.cached_ip = None
     self.cached_public_ip = None
@@ -250,8 +251,10 @@ class Task(backend.Task):
       # right now had to log into tmux to see it
       assert self._is_initialized_file_present()
     else:
+      self.log('No install script. Skipping to end')
       # installation happens through user-data instead of install script
-      pass
+      if not self.user_data: # fake initialization if no user data
+        self.run('echo ok > /tmp/is_initialized')
 
 
     self.connect_instructions = """
