@@ -40,10 +40,19 @@ args = parser.parse_args()
 
 def attach_imagnet_ebs(aws_instance, job, tag='imagenet_high_perf'):
   ec2 = util.create_ec2_resource()
-  v = list(ec2.volumes.filter(Filters=[{'Name':'tag:Name', 'Values':['imagenet_high_perf']}]).all())[0]
-  if v.state != 'available': v.detach_from_instance()
+  v = list(ec2.volumes.filter(Filters=[{'Name':'tag:Name', 'Values':['imagenet_high_perf']}]).all())
+  if not v: return
+  v = v[0]
+  if v.attachments and v.attachments[0]['InstanceId'] == aws_instance.id:
+        return
+  if v.state != 'available': 
+      print('Detaching from current instance')
+      v.detach_from_instance()
+      time.sleep(3)
+  print('Attaching to instance:' , aws_instance.id)
   v.attach_to_instance(InstanceId=aws_instance.id, Device='/dev/xvdf')
-  job.run('sudo mkdir mount_point')
+  time.sleep(3)
+  job.run('sudo mkdir mount_point -p')
   job.run('sudo mount /dev/xvdf mount_point')
   
 
@@ -57,22 +66,8 @@ def main():
   job.wait_until_ready()
   print(job.connect_instructions)
 
-#   attach_imagnet_ebs(run.instances[0], job)
+  attach_imagnet_ebs(job.tasks[0].instance, job)
   
-
-  # tensorboard stuff
-  # if tensorboard is running, kill it, it will prevent efs logdir from being
-  # deleted
-#   job.run("tmux kill-session -t tb || echo ok")
-#   logdir = '/efs/runs/%s/%s'%(args.group, args.name)
-#   job.run('rm -Rf %s || echo failed' % (logdir,)) # delete prev logs
-  
-  # Launch tensorboard visualizer in separate tmux session
-#   job.run("tmux new-session -s tb -n 0 -d")
-#   job.run("tmux send-keys -t tb:0 'source activate pytorch_p36' Enter")
-#   job.run("tmux send-keys -t tb:0 'tensorboard --logdir %s' Enter"%(logdir,))
-
-
 #   run pytorch
   job.run('source activate pytorch_p36')
   job.run('killall python || echo failed')  # kill previous run
@@ -87,11 +82,13 @@ def main():
   # run setup script
   job.run('./setup_env_fastai.sh')
 
-  # run training
+  # run multi-gpu single machine training
   # https://github.com/stanford-futuredata/dawn-bench-entries/pull/44/files
-  job.run_async('python -m multiproc train_imagenet_fastai.py ~/mount_point/imagenet  --sz 224 -b 192 -j 8 --fp16 -a resnet50 --lr 0.40 --epochs 45 --small')
+#   job.run_async('python -m multiproc train_imagenet_fastai.py ~/mount_point/imagenet  --sz 224 -b 192 -j 8 --fp16 -a resnet50 --lr 0.40 --epochs 45 --small')
 # time python -m multiproc fastai_imagenet.py $DATA_DIR --sz $SIZE -j 8 --fp16 -b $BS --loss-scale 512 --save-dir $SAVE_DIR $SARGS |& tee -a $SAVE_DIR/output.log
-# python run_script.py -zone us-west-2b --launch-method find -iname p36 -p rn50_40_45_bnf_main_sml --run-script upload_scripts/train2.sh -sargs "-sargs '-a resnet50 --lr 0.40 --epochs 45 --small'"
+  
+  #
+
 
 if __name__=='__main__':
   main()

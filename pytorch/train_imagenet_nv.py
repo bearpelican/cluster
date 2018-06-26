@@ -64,6 +64,10 @@ def get_parser():
 
     parser.add_argument('--dist-url', default='file://sync.file', type=str,
                         help='url used to set up distributed training')
+    parser.add_argument('--dist-addr', default=None, type=str,
+                        help='IP of master node used to set up distributed training')
+    parser.add_argument('--dist-port', default=None, type=str,
+                        help='Port used to set up distributed training')
     parser.add_argument('--dist-backend', default='nccl', type=str, help='distributed backend')
 
     parser.add_argument('--world-size', default=1, type=int,
@@ -114,7 +118,13 @@ def main():
     if args.distributed:
         args.gpu = args.rank % torch.cuda.device_count()
         torch.cuda.set_device(args.gpu)
-        dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url, world_size=args.world_size)
+        # dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url, world_size=args.world_size)
+        if args.dist_addr: os.environ['MASTER_ADDR'] = args.dist_addr
+        if args.dist_port: os.environ['MASTER_PORT'] = args.dist_port
+        os.environ['WORLD_SIZE'] = str(args.world_size)
+        os.environ['RANK'] = str(args.rank)
+        dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url, world_size=args.world_size, rank=args.rank)
+        print('Distributed: init_process_group success')
 
     if args.fp16: assert torch.backends.cudnn.enabled, "fp16 mode requires cudnn backend to be enabled."
 

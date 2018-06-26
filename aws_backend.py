@@ -37,15 +37,14 @@ class Run(backend.Run):
     self.name = name
     self.kwargs = kwargs
     self.jobs = []
-    self.instances = []
 
   # TODO: get rid of linux type (only login username)
-  def make_job(self, role_name, num_tasks=1, exist_ok=False, **kwargs):
+  def make_job(self, role_name, num_tasks=1, **kwargs):
     assert num_tasks>=0
 
     # TODO: document launch parameters
     job_name = u.format_job_name(role_name, self.name)
-    instances = u.lookup_aws_instances(job_name, exist_ok=exist_ok)
+    instances = u.lookup_aws_instances(job_name)
     kwargs = u.merge_kwargs(kwargs, self.kwargs)
     ami = kwargs['ami']
     instance_type = kwargs['instance_type']
@@ -118,7 +117,6 @@ class Run(backend.Run):
             self.log("create_tags failed with %s, retrying in %d seconds"%(
               str(e), TIMEOUT_SEC))
             time.sleep(TIMEOUT_SEC)
-    self.instances.extend(instances)
     job = Job(self, job_name, instances=instances,
               install_script=install_script,
               linux_type=linux_type,

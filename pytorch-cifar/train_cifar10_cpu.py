@@ -83,8 +83,12 @@ parser.add_argument('--loss-scale', type=float, default=1,
                     help='Loss scaling, positive power of 2 values can improve fp16 convergence.')
 parser.add_argument('--warmup', action='store_true', help='Do a warm-up epoch first')
 parser.add_argument('--prof', dest='prof', action='store_true', help='Only run a few iters for profiling.')
-parser.add_argument('--dist-url', default='file://sync.file', type=str,
+parser.add_argument('--dist-url', default=None, type=str,
                     help='url used to set up distributed training')
+parser.add_argument('--dist-addr', default=None, type=str,
+                    help='IP of master node used to set up distributed training')
+parser.add_argument('--dist-port', default=None, type=str,
+                    help='Port used to set up distributed training')
 parser.add_argument('--dist-backend', default='nccl', type=str, help='distributed backend')
 parser.add_argument('--world-size', default=1, type=int,
                     help='Number of GPUs to use. Can either be manually set ' +
@@ -258,12 +262,17 @@ if args.cpu:
 
 def main():
     args.distributed = args.world_size > 1
+    args.gpu = 0
     if args.distributed:
         if not args.cpu:
             args.gpu = args.rank % torch.cuda.device_count()
             torch.cuda.set_device(args.gpu)
+        if args.dist_addr: os.environ['MASTER_ADDR'] = args.dist_addr
+        if args.dist_port: os.environ['MASTER_PORT'] = args.dist_port
+        os.environ['WORLD_SIZE'] = str(args.world_size)
+        os.environ['RANK'] = str(args.rank)
         dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url, world_size=args.world_size, rank=args.rank)
-        # dist.init_process_group(backend='tcp', init_method='tcp://54.213.160.204:6006', world_size=1)
+        print('Distributed: init_process_group success')
 
     if args.fp16: assert torch.backends.cudnn.enabled, "missing cudnn"
 

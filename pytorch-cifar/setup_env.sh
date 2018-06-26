@@ -7,7 +7,9 @@ if [ ! -d "$FASTAI_DIR" ]; then
     git clone https://github.com/fastai/fastai.git
     cd ~/fastai
     conda env update fastai
-    conda install pytorch torchvision cuda90 -c pytorch
+
+    # Distributed requires putorch 0.4 - consider using cuda91
+    conda install pytorch torchvision cuda90 -c pytorch -y
     ln -s ~/fastai/fastai ~/anaconda3/envs/fastai/lib/python3.6/site-packages
 fi
 

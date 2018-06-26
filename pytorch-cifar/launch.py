@@ -41,7 +41,7 @@ def create_job(run, job_name, num_tasks=2):
   install_script = ''
   with open('setup_env.sh', 'r') as script:
     install_script = script.read()
-  job = run.make_job(job_name, num_tasks=num_tasks, exist_ok=True, instance_type=args.instance_type, install_script=install_script)
+  job = run.make_job(job_name, num_tasks=num_tasks, instance_type=args.instance_type, install_script=install_script)
   job.wait_until_ready()
   print(job.connect_instructions)
 
@@ -61,19 +61,26 @@ def create_job(run, job_name, num_tasks=2):
   job.run('./setup_env.sh')
   job.run('source activate fastai')
 
-  # multi job
-  world_0_ip = job.tasks[0].instance.public_ip_address
-  port = '6006' # 6006, 6007, 6008, 8890, 6379
-  for i,t in enumerate(job.tasks):
-    dist_params = f'--world-size {num_tasks} --rank {i} --dist-url tcp://{world_0_ip}:{port} --dist-backend tcp'
-    # tcp only supports CPU - https://pytorch.org/docs/master/distributed.html
-    # t.run_async(f'python train_cifar10.py ~/data --loss-scale 512 --fp16 --lr 1.4 -b 128 --lr 1.3 {dist_params}') # multi-gpu
-    t.run_async(f'python train_cifar10_cpu.py ~/data --lr 1.4 -b 128 --lr 1.3 {dist_params} --cpu') # multi-gpu
 
-  # start training
-  # job.run_async('python train_cifar10.py ~/data --loss-scale 512 --fp16 --lr 1.3') # multi-gpu
-  # job.run_async('python train_cifar10.py ~/data --loss-scale 512 --fp16') # single instance
-  # job.run_async('python -m multiproc train_imagenet_fastai.py ~/mount_point/imagenet  --sz 224 -b 192 -j 8 --fp16 -a resnet50 --lr 0.40 --epochs 45 --small')
+  # single machine
+  if num_tasks == 1:
+    # job.run_async('python train_cifar10.py ~/data --loss-scale 512 --fp16 --lr 1.3') # multi-gpu
+    job.run_async('python train_cifar10.py ~/data --loss-scale 512 --fp16') # single instance
+    return
+
+  # multi job
+  world_0_ip = job.tasks[0].instance.private_ip_address
+  port = '6006' # 6006, 6007, 6008, 8890, 6379
+  use_tcp = False
+        
+  for i,t in enumerate(job.tasks):
+    # tcp only supports CPU - https://pytorch.org/docs/master/distributed.html
+    if use_tcp: dist_params = f'--world-size {num_tasks} --rank {i} --dist-url tcp://{world_0_ip}:{port} --dist-backend tcp'
+    else: dist_params = f'--world-size {num_tasks} --rank {i} --dist-addr {world_0_ip} --dist-port {port} --dist-url env:// --dist-backend gloo'
+    
+    # t.run_async(f'python train_cifar10.py ~/data --loss-scale 512 --fp16 --lr 1.4 -b 128 --lr 1.3 {dist_params}') # multi-gpu
+    t.run_async(f'python train_cifar10_cpu.py ~/data --lr 1.4 -b 128 --lr 1.3 {dist_params} --cpu') # multi-cpu
+
 
 
 def main():
