@@ -40,12 +40,12 @@ class Run(backend.Run):
     self.instances = []
 
   # TODO: get rid of linux type (only login username)
-  def make_job(self, role_name, num_tasks=1, **kwargs):
+  def make_job(self, role_name, num_tasks=1, exist_ok=False, **kwargs):
     assert num_tasks>=0
 
     # TODO: document launch parameters
     job_name = u.format_job_name(role_name, self.name)
-    instances = u.lookup_aws_instances(job_name)
+    instances = u.lookup_aws_instances(job_name, exist_ok=exist_ok)
     kwargs = u.merge_kwargs(kwargs, self.kwargs)
     ami = kwargs['ami']
     instance_type = kwargs['instance_type']
@@ -65,6 +65,8 @@ class Run(backend.Run):
     if instances:
       assert len(instances) == num_tasks, ("Found job with same name, but number of tasks %d doesn't match requested %d, kill job manually." % (len(instances), num_tasks))
       print("Found existing job "+job_name)
+      for i in instances:
+            if i.state['Name'] == 'stopped': i.start()
     else:
       print("Launching new job %s into VPC %s" %(job_name, u.get_resource_name()))
 
@@ -116,7 +118,7 @@ class Run(backend.Run):
             self.log("create_tags failed with %s, retrying in %d seconds"%(
               str(e), TIMEOUT_SEC))
             time.sleep(TIMEOUT_SEC)
-    self.instances = instances
+    self.instances.extend(instances)
     job = Job(self, job_name, instances=instances,
               install_script=install_script,
               linux_type=linux_type,
@@ -252,7 +254,7 @@ class Task(backend.Task):
 
       self.install_script+='\necho ok > /tmp/is_initialized\n'
       self.file_write('install.sh', u._add_echo(self.install_script))
-      self.run('bash -e install.sh') # fail on errors
+      self.run('bash -e install.sh', max_wait_sec=2400) # fail on errors
       # TODO(y): propagate error messages printed on console to the user
       # right now had to log into tmux to see it
       assert self._is_initialized_file_present()

@@ -579,7 +579,7 @@ def _StreamOutputToStdout(fd):  # todo: pep convention
   
   return t
 
-def lookup_aws_instances(job_name):
+def lookup_aws_instances(job_name, exist_ok=False):
   """Returns all AWS instances for given AWS job name, like
    simple.worker"""
 
@@ -589,8 +589,9 @@ def lookup_aws_instances(job_name):
   ec2 = u.create_ec2_resource()
 
   # TODO: add waiting so that instances in state "initializing" are supported
+  states = ['running', 'stopped'] if exist_ok else ['running']
   instances = ec2.instances.filter(
-    Filters=[{'Name': 'instance-state-name', 'Values': ['running']}])
+    Filters=[{'Name': 'instance-state-name', 'Values': states}])
 
   result = []
   for i in instances.all():

@@ -39,9 +39,9 @@ args = parser.parse_args()
 
 
 def attach_imagnet_ebs(aws_instance, job, tag='imagenet_high_perf'):
-  ec2 = u.create_ec2_client()
+  ec2 = util.create_ec2_resource()
   v = list(ec2.volumes.filter(Filters=[{'Name':'tag:Name', 'Values':['imagenet_high_perf']}]).all())[0]
-  v.detach_from_instance()
+  if v.state != 'available': v.detach_from_instance()
   v.attach_to_instance(InstanceId=aws_instance.id, Device='/dev/xvdf')
   job.run('sudo mkdir mount_point')
   job.run('sudo mount /dev/xvdf mount_point')
@@ -57,7 +57,7 @@ def main():
   job.wait_until_ready()
   print(job.connect_instructions)
 
-  attach_imagnet_ebs(run.instances[0])
+  # attach_imagnet_ebs(run.instances[0], job)
   
 
   # tensorboard stuff
@@ -84,9 +84,11 @@ def main():
   job.upload('multiproc.py')
   job.upload('train_imagenet_nv.py')
   job.upload('resize_images.py')
+  
 
-  # start trianing
-  job.run_async('python train_imagenet_nv.py ~/mount_point/raw-data --batch-size=128 --logdir=%s'%(logdir,))
+  # start training
+  # job.run_async('python -m multiproc train_imagenet_nv.py ~/mount_point/imagenet -b 128, -a resnet50 -j 8 --fp16 -a resnet50 --lr 0.40 --epochs 45 --small')
+  # job.run_async('python -m multiproc train_imagenet_fastai.py ~/mount_point/imagenet  --sz 224 -b 192 -j 8 --fp16 -a resnet50 --lr 0.40 --epochs 45 --small')
 
 
 if __name__=='__main__':

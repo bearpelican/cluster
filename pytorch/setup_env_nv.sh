@@ -73,10 +73,6 @@ CC="cc -mavx2" pip install -U --force-reinstall pillow-simd
 rm ~/data/imagenet/val/make-data.py
 rm ~/data/imagenet/val/valprep.sh
 rm ~/data/imagenet/val/meta.pkl
-OLD_BACKUP=$SAVE_DIR/backup
-mkdir $OLD_BACKUP
-mv *.log $OLD_BACKUP
-mv *.tar $OLD_BACKUP
 
 if [[ -n "$WARMUP" ]]; then
     echo "$(date '+%Y-%m-%d-%H-%M-%S') Warming up volume." |& tee -a $SAVE_DIR/script.log

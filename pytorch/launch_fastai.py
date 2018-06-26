@@ -39,9 +39,9 @@ args = parser.parse_args()
 
 
 def attach_imagnet_ebs(aws_instance, job, tag='imagenet_high_perf'):
-  ec2 = u.create_ec2_client()
+  ec2 = util.create_ec2_resource()
   v = list(ec2.volumes.filter(Filters=[{'Name':'tag:Name', 'Values':['imagenet_high_perf']}]).all())[0]
-  v.detach_from_instance()
+  if v.state != 'available': v.detach_from_instance()
   v.attach_to_instance(InstanceId=aws_instance.id, Device='/dev/xvdf')
   job.run('sudo mkdir mount_point')
   job.run('sudo mount /dev/xvdf mount_point')
@@ -57,7 +57,7 @@ def main():
   job.wait_until_ready()
   print(job.connect_instructions)
 
-  attach_imagnet_ebs(run.instances[0])
+#   attach_imagnet_ebs(run.instances[0], job)
   
 
   # tensorboard stuff
@@ -88,8 +88,10 @@ def main():
   job.run('./setup_env_fastai.sh')
 
   # run training
-  job.run_async('python train_imagenet_fastai.py ~/mount_point/raw-data --batch-size=128 --logdir=%s'%(logdir,))
-
+  # https://github.com/stanford-futuredata/dawn-bench-entries/pull/44/files
+  job.run_async('python -m multiproc train_imagenet_fastai.py ~/mount_point/imagenet  --sz 224 -b 192 -j 8 --fp16 -a resnet50 --lr 0.40 --epochs 45 --small')
+# time python -m multiproc fastai_imagenet.py $DATA_DIR --sz $SIZE -j 8 --fp16 -b $BS --loss-scale 512 --save-dir $SAVE_DIR $SARGS |& tee -a $SAVE_DIR/output.log
+# python run_script.py -zone us-west-2b --launch-method find -iname p36 -p rn50_40_45_bnf_main_sml --run-script upload_scripts/train2.sh -sargs "-sargs '-a resnet50 --lr 0.40 --epochs 45 --small'"
 
 if __name__=='__main__':
   main()
