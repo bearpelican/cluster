@@ -93,18 +93,21 @@ if args.local_rank > 0: sys.stdout = open(f'{args.save_dir}/GPU_{args.local_rank
 
 #Dali based pipeline for imagenet, assuems c2 based lmdb:
 class HybridPipe(Pipeline):
-    def __init__(self, batch_size, target_size, num_threads, device_id, data_dir):
+    def __init__(self, batch_size, image_size, num_threads, device_id, data_dir):
         super(HybridPipe, self).__init__(batch_size,
                                          num_threads,
                                          device_id)
-        self.input = ops.Caffe2Reader(path = data_dir, shard_id = args.rank, num_shards = args.world_size)
+        rank = args.local_rank
+        if args.distributed: rank = dist.get_rank()
+        self.input = ops.FileReader(file_root = data_dir, shard_id = rank, num_shards = args.world_size)
+        # self.input = ops.Caffe2Reader(path = data_dir, shard_id = rank, num_shards = args.world_size)
         self.decode= ops.nvJPEGDecoder(device = "mixed", output_type = types.RGB)
-        self.rrc = ops.RandomResizedCrop(device = "gpu", size = (target_size, target_size))
+        self.rrc = ops.RandomResizedCrop(device = "gpu", size = (image_size, image_size))
         self.cmnp = ops.CropMirrorNormalize(device = "gpu",
                                             output_dtype = types.FLOAT,
                                             output_layout = types.NCHW,
                                             image_type = types.RGB,
-                                            crop = (224, 224),
+                                            crop = (image_size, image_size),
                                             mean = [0.485 * 255, 0.456 * 255, 0.406 * 255],
                                             std = [0.229 * 255, 0.224 * 255, 0.225 * 255])
 
@@ -344,14 +347,14 @@ class DataManager():
         traindir = args.data+dir_prefix+'/train'
         valdir = args.data+dir_prefix+'/validation'
 
-        pipe = HybridPipe(batch_size=batch_size, num_threads=args.workers, device_id=args.local_rank, data_dir=traindir)
+        pipe = HybridPipe(batch_size=batch_size, image_size=image_size, num_threads=args.workers, device_id=args.local_rank, data_dir=traindir)
         pipe.build()
         test_run = pipe.run()
         from nvidia.dali.plugin.pytorch import DALIClassificationIterator
         train_loader = DALIClassificationIterator(pipe, size=int(1281167 / args.world_size) )
 
 
-        pipe = HybridPipe(batch_size=batch_size, num_threads=args.workers, device_id = args.local_rank, data_dir=valdir)
+        pipe = HybridPipe(batch_size=batch_size, image_size=image_size, num_threads=args.workers, device_id = args.local_rank, data_dir=valdir)
         pipe.build()
         test_run = pipe.run()
         from nvidia.dali.plugin.pytorch import DALIClassificationIterator
@@ -360,12 +363,17 @@ class DataManager():
         self.trn_dl = train_loader
         self.val_dl = val_loader
 
+        self.trn_smp = None
+        self.val_smp = None
+
         # self.trn_dl,self.val_dl,self.trn_smp,self.val_smp = get_loaders(traindir, valdir, bs=batch_size, sz=image_size, **kwargs)
         # self.trn_dl = DataPrefetcher(self.trn_dl)
         # self.val_dl = DataPrefetcher(self.val_dl, prefetch=False)
-        self.trn_len = len(self.trn_dl)
-        self.val_len = len(self.val_dl)
+        # self.trn_len = len(self.trn_dl)
+        # self.val_len = len(self.val_dl)
         # clear memory
+        self.trn_len = int(1281167 / args.world_size)
+        self.val_len = int(50000 / args.world_size)
         gc.collect()
         torch.cuda.empty_cache()
 
@@ -503,10 +511,10 @@ def main():
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=UserWarning)
-            train(dm.trn_dl, len(dm.trn_dl), model, criterion, optimizer, scheduler, epoch)
+            train(dm.trn_dl, dm.trn_len, model, criterion, optimizer, scheduler, epoch)
 
         if args.prof: break
-        prec5 = validate(dm.val_dl, len(dm.val_dl), model, criterion, epoch, start_time)
+        prec5 = validate(dm.val_dl, dm.val_len, model, criterion, epoch, start_time)
 
         is_best = prec5 > best_prec5
         if args.local_rank == 0 and is_best:
@@ -541,7 +549,10 @@ def train(trn_iter, trn_len, model, criterion, optimizer, scheduler, epoch):
 
     st = time.time()
     # print('Begin training loop:', st)
-    for i,(input,target) in enumerate(trn_iter):
+    for i,data in enumerate(trn_iter):
+        input = data[0][0][0]
+        target = data[0][1][0].cuda().long()
+
         # if i == 0: print('Received input:', time.time()-st)
         if args.prof and (i > 200): break
 
@@ -615,7 +626,10 @@ def validate(val_iter, val_len, model, criterion, epoch, start_time):
     model.eval()
     end = time.time()
 
-    for i,(input,target) in enumerate(val_iter):
+    for i,data in enumerate(val_iter):        
+        input = data[0][0][0]
+        target = data[0][1][0].cuda().long()
+
         if args.distributed:
             prec1, prec5, loss, tot_batch = distributed_predict(input, target, model, criterion)
         else:

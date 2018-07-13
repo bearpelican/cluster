@@ -16,7 +16,7 @@ conda install tqdm -y
 
 
 # install nvidia DALI
-pip install --extra-index-url https://developer.download.nvidia.com/compute/redist nvidia-dali -y
+pip install --extra-index-url https://developer.download.nvidia.com/compute/redist nvidia-dali
 
 # wget https://s3-us-west-2.amazonaws.com/ashaw-fastai-imagenet/cuda-linux64-nvjpeg-9.0.tar.gz
 # tar xzvf cuda-linux64-nvjpeg-9.0.tar.gz
