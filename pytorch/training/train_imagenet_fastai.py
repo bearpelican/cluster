@@ -26,6 +26,14 @@ from datetime import datetime
 #                      and callable(models.__dict__[name]))
 # print(model_names)
 
+try:
+    from nvidia.dali.plugin.pytorch import DALIClassificationIterator
+    from nvidia.dali.pipeline import Pipeline
+    import nvidia.dali.ops as ops
+    import nvidia.dali.types as types
+except ImportError:
+    raise ImportError("Please install dali from https://www.github.com/nvidia/dali to run this example.")
+
 
 def get_parser():
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
@@ -69,6 +77,38 @@ def get_parser():
                         help='Used for multi-process training. Can either be manually set ' +
                         'or automatically set by using \'python -m multiproc\'.')
     return parser
+
+
+
+#Dali based pipeline for imagenet, assuems c2 based lmdb:
+class HybridPipe(Pipeline):
+    def __init__(self, batch_size, target_size, num_threads, device_id, data_dir):
+        super(HybridPipe, self).__init__(batch_size,
+                                         num_threads,
+                                         device_id)
+        self.input = ops.Caffe2Reader(path = data_dir, shard_id = args.rank, num_shards = args.world_size)
+        self.decode= ops.nvJPEGDecoder(device = "mixed", output_type = types.RGB)
+        self.rrc = ops.RandomResizedCrop(device = "gpu", size = (target_size, target_size))
+        self.cmnp = ops.CropMirrorNormalize(device = "gpu",
+                                            output_dtype = types.FLOAT,
+                                            output_layout = types.NCHW,
+                                            image_type = types.RGB,
+                                            crop = (224, 224),
+                                            mean = [0.485 * 255, 0.456 * 255, 0.406 * 255],
+                                            std = [0.229 * 255, 0.224 * 255, 0.225 * 255])
+
+        self.coin = ops.CoinFlip(probability = 0.5)
+
+    def define_graph(self):
+        rng = self.coin()
+        self.jpegs, self.labels = self.input(name="Reader")
+        images = self.decode(self.jpegs)
+        images = self.rrc(images)
+        output = self.cmnp(images, mirror = rng)
+        return [output, self.labels]
+
+    def iter_setup(self):
+        pass
 
 def torch_loader(data_path, size, use_val_sampler=True, min_scale=0.08, bs=192):
     traindir = os.path.join(data_path, 'train')

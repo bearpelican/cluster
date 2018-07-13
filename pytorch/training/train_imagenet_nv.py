@@ -30,6 +30,15 @@ from tqdm import tqdm
 
 from autoaugment import ImageNetPolicy
 
+try:
+    from nvidia.dali.plugin.pytorch import DALIClassificationIterator
+    from nvidia.dali.pipeline import Pipeline
+    import nvidia.dali.ops as ops
+    import nvidia.dali.types as types
+except ImportError:
+    raise ImportError("Please install dali from https://www.github.com/nvidia/dali to run this example.")
+
+
 def get_parser():
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
     parser.add_argument('data', metavar='DIR', help='path to dataset')
@@ -79,6 +88,39 @@ def get_parser():
 cudnn.benchmark = True
 args = get_parser().parse_args()
 if args.local_rank > 0: sys.stdout = open(f'{args.save_dir}/GPU_{args.local_rank}.log', 'w')
+
+
+
+#Dali based pipeline for imagenet, assuems c2 based lmdb:
+class HybridPipe(Pipeline):
+    def __init__(self, batch_size, target_size, num_threads, device_id, data_dir):
+        super(HybridPipe, self).__init__(batch_size,
+                                         num_threads,
+                                         device_id)
+        self.input = ops.Caffe2Reader(path = data_dir, shard_id = args.rank, num_shards = args.world_size)
+        self.decode= ops.nvJPEGDecoder(device = "mixed", output_type = types.RGB)
+        self.rrc = ops.RandomResizedCrop(device = "gpu", size = (target_size, target_size))
+        self.cmnp = ops.CropMirrorNormalize(device = "gpu",
+                                            output_dtype = types.FLOAT,
+                                            output_layout = types.NCHW,
+                                            image_type = types.RGB,
+                                            crop = (224, 224),
+                                            mean = [0.485 * 255, 0.456 * 255, 0.406 * 255],
+                                            std = [0.229 * 255, 0.224 * 255, 0.225 * 255])
+
+        self.coin = ops.CoinFlip(probability = 0.5)
+
+    def define_graph(self):
+        rng = self.coin()
+        self.jpegs, self.labels = self.input(name="Reader")
+        images = self.decode(self.jpegs)
+        images = self.rrc(images)
+        output = self.cmnp(images, mirror = rng)
+        return [output, self.labels]
+
+    def iter_setup(self):
+        pass
+
 
 
 def fast_collate(batch):
@@ -301,9 +343,26 @@ class DataManager():
     def load_data(self, dir_prefix, batch_size, image_size, **kwargs):
         traindir = args.data+dir_prefix+'/train'
         valdir = args.data+dir_prefix+'/validation'
-        self.trn_dl,self.val_dl,self.trn_smp,self.val_smp = get_loaders(traindir, valdir, bs=batch_size, sz=image_size, **kwargs)
-        self.trn_dl = DataPrefetcher(self.trn_dl)
-        self.val_dl = DataPrefetcher(self.val_dl, prefetch=False)
+
+        pipe = HybridPipe(batch_size=batch_size, num_threads=args.workers, device_id=args.local_rank, data_dir=traindir)
+        pipe.build()
+        test_run = pipe.run()
+        from nvidia.dali.plugin.pytorch import DALIClassificationIterator
+        train_loader = DALIClassificationIterator(pipe, size=int(1281167 / args.world_size) )
+
+
+        pipe = HybridPipe(batch_size=batch_size, num_threads=args.workers, device_id = args.local_rank, data_dir=valdir)
+        pipe.build()
+        test_run = pipe.run()
+        from nvidia.dali.plugin.pytorch import DALIClassificationIterator
+        val_loader = DALIClassificationIterator(pipe, size=int(50000 / args.world_size) )
+
+        self.trn_dl = train_loader
+        self.val_dl = val_loader
+
+        # self.trn_dl,self.val_dl,self.trn_smp,self.val_smp = get_loaders(traindir, valdir, bs=batch_size, sz=image_size, **kwargs)
+        # self.trn_dl = DataPrefetcher(self.trn_dl)
+        # self.val_dl = DataPrefetcher(self.val_dl, prefetch=False)
         self.trn_len = len(self.trn_dl)
         self.val_len = len(self.val_dl)
         # clear memory
@@ -444,10 +503,10 @@ def main():
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=UserWarning)
-            train(dm.get_trn_iter(), len(dm.trn_dl), model, criterion, optimizer, scheduler, epoch)
+            train(dm.trn_dl, len(dm.trn_dl), model, criterion, optimizer, scheduler, epoch)
 
         if args.prof: break
-        prec5 = validate(dm.get_val_iter(), len(dm.val_dl), model, criterion, epoch, start_time)
+        prec5 = validate(dm.val_dl, len(dm.val_dl), model, criterion, epoch, start_time)
 
         is_best = prec5 > best_prec5
         if args.local_rank == 0 and is_best:
@@ -456,6 +515,8 @@ def main():
                 'epoch': epoch + 1, 'arch': args.arch, 'state_dict': model.state_dict(),
                 'best_prec5': best_prec5, 'optimizer' : optimizer.state_dict(),
             }, is_best)
+        dm.trn_dl.reset()
+        dm.val_dl.reset()
 
 def str_to_num_array(argstr):
     return [float(s) for s in argstr.split(',')]

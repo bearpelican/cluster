@@ -51,6 +51,7 @@ source activate pytorch_source
 conda install numpy pyyaml mkl mkl-include setuptools cmake cffi typing -y
 conda install -c mingfeima mkldnn -y
 conda install -c pytorch magma-cuda90 -y
+conda install tqdm -y
 
 python setup.py install
 

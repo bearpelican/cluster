@@ -14,6 +14,22 @@ fi
 conda install pytorch torchvision cuda90 -c pytorch -y
 conda install tqdm -y
 
+
+# install nvidia DALI
+pip install --extra-index-url https://developer.download.nvidia.com/compute/redist nvidia-dali -y
+
+# wget https://s3-us-west-2.amazonaws.com/ashaw-fastai-imagenet/cuda-linux64-nvjpeg-9.0.tar.gz
+# tar xzvf cuda-linux64-nvjpeg-9.0.tar.gz
+
+# pip install protobuf -y
+
+# apt-get remove libjpeg8
+# sudo apt-get install libjpeg-turbo8
+
+# pip install opencv-contrib-python
+
+
+
 # setting max speed. Doesn't seem to boost performace though
 sudo nvidia-smi -ac 877,1530
 
