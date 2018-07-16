@@ -16,18 +16,16 @@ import torchvision
 import pickle
 from tqdm import tqdm
 
-# from autoaugment import ImageNetPolicy
+from autoaugment import ImageNetPolicy
 
-def get_loaders(datadir, sz, bs, val_bs=None, workers=8, use_ar=False, min_scale=0.08, max_scale=1.0, distributed=False):
+def get_loaders(datadir, sz, bs, val_bs=None, workers=8, use_ar=False, min_scale=0.08, max_scale=1.0, distributed=False, autoaugment=False):
     traindir = datadir+'/train'
     valdir = datadir+'/validation'
     val_bs = val_bs or bs
-    train_dataset = datasets.ImageFolder(
-        traindir, transforms.Compose([
-            transforms.RandomResizedCrop(sz, scale=(min_scale, max_scale)),
-            transforms.RandomHorizontalFlip(), 
-            # ImageNetPolicy()
-        ]))
+    
+    trn_tfms = [transforms.RandomResizedCrop(sz, scale=(min_scale, max_scale)), transforms.RandomHorizontalFlip()]
+    if autoaugment: trn_tfms.append(ImageNetPolicy())
+    train_dataset = datasets.ImageFolder(traindir, transforms.Compose(trn_tfms))
     train_sampler = (torch.utils.data.distributed.DistributedSampler(train_dataset) if distributed else None)
 
     train_loader = torch.utils.data.DataLoader(

@@ -79,13 +79,14 @@ if args.local_rank > 0: sys.stdout = open(f'{args.save_dir}/GPU_{args.local_rank
 class DataManager():
     def __init__(self, resize_sched=[0.4, 0.92]):
         self.resize_sched = resize_sched
-        self.load_data('-sz/160', args.batch_size, 128)
+        self.load_data('-sz/160', args.batch_size, 128, min_scale=0.16, autoaugment=True)
         
     def set_epoch(self, epoch):
         if epoch==int(args.epochs*self.resize_sched[0]+0.5):
             # self.load_data('', args.batch_size, 224)
             # self.load_data('-sz/320', args.batch_size, 224, min_scale=0.097, max_scale=1.21) # lower validation accuracy when enabled for some reason
-            self.load_data('-sz/320', args.batch_size, 224, min_scale=0.096, max_scale=1.21) # lower validation accuracy when enabled for some reason
+            self.load_data('-sz/320', args.batch_size, 224, min_scale=0.2, max_scale=1.1, autoaugment=True) # lower validation accuracy when enabled for some reason
+            # self.load_data('-sz/320', args.batch_size, 224, min_scale=0.093, max_scale=1.15) # right terminal experiment
         if epoch==int(args.epochs*self.resize_sched[1]+0.5):
             self.load_data('', 64, 288, min_scale=0.5, use_ar=args.val_ar)
 
@@ -259,6 +260,9 @@ def main():
                 'epoch': epoch + 1, 'arch': args.arch, 'state_dict': model.state_dict(),
                 'best_prec5': best_prec5, 'optimizer' : optimizer.state_dict(),
             }, is_best)
+
+    # save script so we can reproduce from logs
+    shutil.copy2(os.path.realpath(__file__), f'{args.save_dir}')
 
 def str_to_num_array(argstr):
     return [float(s) for s in argstr.split(',')]
