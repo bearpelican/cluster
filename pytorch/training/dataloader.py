@@ -18,13 +18,13 @@ from tqdm import tqdm
 
 # from autoaugment import ImageNetPolicy
 
-def get_loaders(datadir, sz, bs, val_bs=None, workers=8, use_ar=False, min_scale=0.08, distributed=False):
+def get_loaders(datadir, sz, bs, val_bs=None, workers=8, use_ar=False, min_scale=0.08, max_scale=1.0, distributed=False):
     traindir = datadir+'/train'
     valdir = datadir+'/validation'
     val_bs = val_bs or bs
     train_dataset = datasets.ImageFolder(
         traindir, transforms.Compose([
-            transforms.RandomResizedCrop(sz, scale=(min_scale, 1.0)),
+            transforms.RandomResizedCrop(sz, scale=(min_scale, max_scale)),
             transforms.RandomHorizontalFlip(), 
             # ImageNetPolicy()
         ]))

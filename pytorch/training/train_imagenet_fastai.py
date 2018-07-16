@@ -74,7 +74,7 @@ def get_parser():
                         'or automatically set by using \'python -m multiproc\'.')
     return parser
 
-def torch_loader(data_path, size, use_val_sampler=True, min_scale=0.08, bs=192):
+def torch_loader(data_path, size, use_val_sampler=True, min_scale=0.08, max_scale=1.0, bs=192):
     traindir = os.path.join(data_path, 'train')
     valdir = os.path.join(data_path, 'validation')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -82,7 +82,7 @@ def torch_loader(data_path, size, use_val_sampler=True, min_scale=0.08, bs=192):
 
     train_dataset = datasets.ImageFolder(
         traindir, transforms.Compose([
-            transforms.RandomResizedCrop(size, scale=(min_scale, 1.0)),
+            transforms.RandomResizedCrop(size, scale=(min_scale, max_scale)),
             transforms.RandomHorizontalFlip(),
         ] + tensor_tfm))
     val_dataset = datasets.ImageFolder(

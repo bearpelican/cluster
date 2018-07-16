@@ -83,9 +83,9 @@ class DataManager():
         
     def set_epoch(self, epoch):
         if epoch==int(args.epochs*self.resize_sched[0]+0.5):
-            # self.load_data('-sz/320', args.batch_size, 224) # lower validation accuracy when enabled for some reason
-            print('DataManager changing image size to 244')
-            self.load_data('', args.batch_size, 224)
+            # self.load_data('', args.batch_size, 224)
+            # self.load_data('-sz/320', args.batch_size, 224, min_scale=0.097, max_scale=1.21) # lower validation accuracy when enabled for some reason
+            self.load_data('-sz/320', args.batch_size, 224, min_scale=0.096, max_scale=1.21) # lower validation accuracy when enabled for some reason
         if epoch==int(args.epochs*self.resize_sched[1]+0.5):
             self.load_data('', 64, 288, min_scale=0.5, use_ar=args.val_ar)
 
