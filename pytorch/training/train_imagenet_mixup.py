@@ -79,16 +79,16 @@ if args.local_rank > 0: sys.stdout = open(f'{args.save_dir}/GPU_{args.local_rank
 class DataManager():
     def __init__(self, resize_sched=[0.4, 0.92]):
         self.resize_sched = resize_sched
-        self.load_data('-sz/160', args.batch_size, 128, min_scale=0.16, autoaugment=True)
+        self.load_data('-sz/160', args.batch_size, 128)
         
     def set_epoch(self, epoch):
         if epoch==int(args.epochs*self.resize_sched[0]+0.5):
-            # self.load_data('', args.batch_size, 224)
+            self.load_data('', args.batch_size, 224)
             # self.load_data('-sz/320', args.batch_size, 224, min_scale=0.097, max_scale=1.21) # lower validation accuracy when enabled for some reason
-            self.load_data('-sz/320', args.batch_size, 224, min_scale=0.2, max_scale=1.1, autoaugment=True) # lower validation accuracy when enabled for some reason
+            # self.load_data('-sz/320', args.batch_size, 224, min_scale=0.0968) # lower validation accuracy when enabled for some reason
             # self.load_data('-sz/320', args.batch_size, 224, min_scale=0.093, max_scale=1.15) # right terminal experiment
         if epoch==int(args.epochs*self.resize_sched[1]+0.5):
-            self.load_data('', 128, 288, min_scale=0.5, use_ar=args.val_ar)
+            self.load_data('', 96, 288, min_scale=0.5, use_ar=args.val_ar)
 
         if hasattr(self.trn_smp, 'set_epoch'): self.trn_smp.set_epoch(epoch)
         if hasattr(self.val_smp, 'set_epoch'): self.val_smp.set_epoch(epoch)
@@ -109,6 +109,8 @@ class DataManager():
         loaders = get_loaders(datadir, bs=batch_size, sz=image_size, workers=args.workers, distributed=args.distributed, **kwargs)
         self.trn_dl,self.val_dl,self.trn_smp,self.val_smp = loaders
         self.trn_dl = DataPrefetcher(self.trn_dl)
+        self.trn_dl = MixUpDataLoader(self.trn_dl, 0.2)
+        # self.trn_dl = DataPrefetcher(self.trn_dl)
         self.val_dl = DataPrefetcher(self.val_dl, prefetch=False)
         self.trn_len = len(self.trn_dl)
         self.val_len = len(self.val_dl)
@@ -186,6 +188,61 @@ def init_dist_weights(model):
             if isinstance(m, nn.Linear):
                 m.weight.data.normal_(0, 0.01)
 
+from functools import partial
+class MixUpDataLoader(object):
+    """
+    Creates a new data loader with mixup from a given dataloader.
+    
+    Mixup is applied between a batch and a shuffled version of itself. 
+    If we use a regular beta distribution, this can create near duplicates as some lines might be 
+    1 * original + 0 * shuffled while others could be 0 * original + 1 * shuffled, this is why
+    there is a trick where we take the maximum of lambda and 1-lambda.
+    
+    Arguments:
+    dl (DataLoader): the data loader to mix up
+    alpha (float): value of the parameter to use in the beta distribution.
+    """
+    def __init__(self, dl, alpha):
+        self.dl, self.alpha = dl, alpha
+        
+    def __len__(self):
+        return len(self.dl)
+    
+    def __iter__(self):
+        for (x, y) in iter(self.dl):
+            #Taking one different lambda per image speeds up training 
+            lambd = np.random.beta(self.alpha, self.alpha, y.size(0))
+            #Trick to avoid near duplicates
+            lambd = np.concatenate([lambd[:,None], 1-lambd[:,None]], 1).max(1)
+#             lambd = to_gpu(VV(lambd))
+            lambd = torch.from_numpy(lambd).cuda().float()
+            shuffle = torch.randperm(y.size(0))
+            x = x.cuda().half()
+            x1, y1 = x[shuffle], y[shuffle]
+            lamd_rs = lambd.view(lambd.size(0),1,1,1).half()
+            # lambd = lambd.view(lambd.size(0),1,1,1).half()
+            new_x = x * lamd_rs + x1 * (1-lamd_rs)
+            yield (new_x, [y, y1, lambd.half()])
+
+class MixUpLoss(nn.Module):
+    """
+    Adapts the loss function to go with mixup.
+    
+    Since the targets aren't one-hot encoded, we use the linearity of the loss function with
+    regards to the target to mix up the loss instead of one-hot encoded targets.
+    
+    Argument:
+    crit: a loss function. It must have the parameter reduced=False to have the loss per element.
+    """
+    def __init__(self, crit):
+        super().__init__()
+        self.crit = crit()
+        
+    def forward(self, output, target):
+        if not isinstance(target, list): return self.crit(output, target).mean()
+        loss1, loss2 = self.crit(output,target[0]), self.crit(output,target[1])
+        return (loss1 * target[2] + loss2 * (1-target[2])).mean()
+
 def main():
     print(args)
     print("~~epoch\thours\ttop1Accuracy\n")
@@ -218,7 +275,9 @@ def main():
     else: master_params = list(model.parameters())
 
     # define loss function (criterion) and optimizer
-    criterion = nn.CrossEntropyLoss().cuda()
+    # criterion = nn.CrossEntropyLoss().cuda()
+    criterion = MixUpLoss(partial(nn.CrossEntropyLoss, reduce=False)).cuda()
+
     optimizer = torch.optim.SGD(master_params, args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     scheduler = Scheduler(optimizer, str_to_num_array(args.lr_sched))
 
@@ -301,18 +360,18 @@ def train(trn_iter, trn_len, model, criterion, optimizer, scheduler, epoch):
         loss = criterion(output, target)
 
         # measure accuracy and record loss
-        prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
+        # prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
 
         if args.distributed:
             reduced_loss = reduce_tensor(loss.data)
-            prec1 = reduce_tensor(prec1)
-            prec5 = reduce_tensor(prec5)
+            # prec1 = reduce_tensor(prec1)
+            # prec5 = reduce_tensor(prec5)
         else:
             reduced_loss = loss.data
 
         losses.update(to_python_float(reduced_loss), input.size(0))
-        top1.update(to_python_float(prec1), input.size(0))
-        top5.update(to_python_float(prec5), input.size(0))
+        # top1.update(to_python_float(prec1), input.size(0))
+        # top5.update(to_python_float(prec5), input.size(0))
 
         loss = loss*args.loss_scale
         # compute gradient and do SGD step

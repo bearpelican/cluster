@@ -22,7 +22,7 @@ def get_loaders(datadir, sz, bs, val_bs=None, workers=8, use_ar=False, min_scale
     traindir = datadir+'/train'
     valdir = datadir+'/validation'
     val_bs = val_bs or bs
-    
+
     trn_tfms = [transforms.RandomResizedCrop(sz, scale=(min_scale, max_scale)), transforms.RandomHorizontalFlip()]
     if autoaugment: trn_tfms.append(ImageNetPolicy())
     train_dataset = datasets.ImageFolder(traindir, transforms.Compose(trn_tfms))
@@ -79,7 +79,9 @@ class DataPrefetcher():
         self.next_input, self.next_target = next(self.loaditer)
         with torch.cuda.stream(self.stream):
             self.next_input = self.process_input(self.next_input)
-            self.next_target = self.next_target.cuda(async=True)
+            if isinstance(self.next_target, list):
+                self.next_target = [t.cuda(async=True) for t in self.next_target]
+            else: self.next_target = self.next_target.cuda(async=True)
     
     def process_input(self, input, async=True):
         input = input.cuda(async=async)

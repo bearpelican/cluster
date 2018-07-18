@@ -44,7 +44,7 @@ def get_parser():
     parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
                         metavar='W', help='weight decay (default: 1e-4)')
     parser.add_argument('--resize-sched', default='0.4,0.92', type=str,
-                        help='Scheduler to resize from 128 -> 224 -> 288')
+                        help='Dataset resize schedule: ')
     parser.add_argument('--lr-sched', default='0.1,0.47,0.78,0.95', type=str,
                         help='Learning rate scheduler warmup -> lr -> lr/10 -> lr/100 -> lr/1000')
     parser.add_argument('--init-bn0', action='store_true', help='Intialize running batch norm mean to 0')
@@ -79,16 +79,14 @@ if args.local_rank > 0: sys.stdout = open(f'{args.save_dir}/GPU_{args.local_rank
 class DataManager():
     def __init__(self, resize_sched=[0.4, 0.92]):
         self.resize_sched = resize_sched
-        self.load_data('-sz/160', args.batch_size, 128, min_scale=0.16, autoaugment=True)
+        self.load_data('-sz/160', args.batch_size, 128)
         
     def set_epoch(self, epoch):
         if epoch==int(args.epochs*self.resize_sched[0]+0.5):
             # self.load_data('', args.batch_size, 224)
-            # self.load_data('-sz/320', args.batch_size, 224, min_scale=0.097, max_scale=1.21) # lower validation accuracy when enabled for some reason
-            self.load_data('-sz/320', args.batch_size, 224, min_scale=0.2, max_scale=1.1, autoaugment=True) # lower validation accuracy when enabled for some reason
-            # self.load_data('-sz/320', args.batch_size, 224, min_scale=0.093, max_scale=1.15) # right terminal experiment
+            self.load_data('-sz/320', args.batch_size, 224, min_scale=0.091) # lower validation accuracy when enabled for some reason
         if epoch==int(args.epochs*self.resize_sched[1]+0.5):
-            self.load_data('', 64, 288, min_scale=0.5, use_ar=args.val_ar)
+            self.load_data('', 92, 288, min_scale=0.5, use_ar=args.val_ar)
 
         if hasattr(self.trn_smp, 'set_epoch'): self.trn_smp.set_epoch(epoch)
         if hasattr(self.val_smp, 'set_epoch'): self.val_smp.set_epoch(epoch)
@@ -138,7 +136,7 @@ class Scheduler():
         lr = step_size*(epoch+1) + batch_step_size*batch_num
 
         if (args.world_size >= 32) and (epoch < epoch_tot):
-            starting_lr = starting_lr/(4 - epoch)
+            starting_lr = starting_lr/(epoch_tot - epoch)
         return lr
 
     def get_lr(self, epoch, batch_num, batch_tot):
@@ -204,6 +202,8 @@ def main():
     if args.fp16: assert torch.backends.cudnn.enabled, "fp16 mode requires cudnn backend to be enabled."
 
     model = resnet.resnet50(pretrained=args.pretrained)
+    # model = resnet.w125_resnet50()
+    # model = resnet.w125_resnet50_scale()
     print("Loaded model")
 
     model = model.cuda()
@@ -219,6 +219,9 @@ def main():
 
     # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda()
+
+    # from adamw import AdamW
+    # optimizer = AdamW(master_params, args.lr, betas=(0.95,0.99), weight_decay=args.weight_decay)
     optimizer = torch.optim.SGD(master_params, args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     scheduler = Scheduler(optimizer, str_to_num_array(args.lr_sched))
 

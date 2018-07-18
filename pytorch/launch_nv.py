@@ -100,23 +100,43 @@ x_args_128 = [
 # Current benchmark for 4x p3's - without Aspect Ratio Validatoin
 x4_args = [
   '--lr-sched', '0.14,0.47,0.78,0.95',
-  '--epochs', 50,
+  '--epochs', 46,
   '--lr', 0.4 * 4,
   '--init-bn0',
   '--batch-size', 192
 ]
 
-# Current benchmark for 4x p3's - without Aspect Ratio Validatoin
+# Experimenting with Adamw
 x4_args_exp1 = [
+  '--lr-sched', '0.12,0.47,0.78,0.95',
+  '--epochs', 50,
+  '--lr', 0.010 * 4,
+  # '--init-bn0',
+  '--batch-size', 192,
+  '--weight-decay', 1e-3
+]
+
+# Experiments with mixup
+x4_args_exp2 = [
   '--lr-sched', '0.14,0.47,0.78,0.95',
   '--epochs', 50,
   '--lr', 0.4 * 4,
   '--init-bn0',
   '--batch-size', 192,
-  '--weight-decay', 7e-5
+  '--weight-decay', 5e-5
 ]
 
-# Current benchmark for 4x p3's - with Aspect Ratio Validatoin
+# Experimenting with wideresnet
+x4_args_exp3 = [
+  '--lr-sched', '0.14,0.47,0.78,0.95',
+  '--epochs', 50,
+  '--lr', 0.4 * 4,
+  # '--init-bn0',
+  '--batch-size', 192,
+  '--weight-decay', 5e-5,
+]
+
+# Current benchmark for 4x p3's - with Aspect Ratio Validation
 x4ar_args = [
   '--lr-sched', '0.14,0.43,0.73,0.94',
   '--resize-sched', '0.35,0.88',
@@ -126,7 +146,7 @@ x4ar_args = [
   '--batch-size', 192,
   '--val-ar'
 ]
-# Current benchmark for 8x p3's - without Aspect Ratio Validatoin
+# Current benchmark for 8x p3's - without Aspect Ratio Validation
 x8_args = [
   '--lr-sched', '0.14,0.47,0.78,0.95',
   '--epochs', 55,
@@ -134,8 +154,31 @@ x8_args = [
   '--init-bn0',
   '--batch-size', 128
 ]
-# Current benchmark for 8x p3's - with Aspect Ratio Validatoin
+
+# Testing wide resnets
+x8_args_wide = [
+  '--lr-sched', '0.14,0.47,0.78,0.95',
+  '--epochs', 45,
+  '--lr', 0.3 * 8,
+  '--init-bn0',
+  '--batch-size', 128
+]
+
+# Current benchmark for 8x p3's - with Aspect Ratio Validation
 x8ar_args = [
+  '--lr-sched', '0.14,0.43,0.75,0.94',
+  '--resize-sched', '0.35,0.88',
+  '--epochs', 40,
+  '--lr', 0.25 * 8,
+  '--init-bn0',
+  '--batch-size', 128,
+  '--val-ar',
+  # '--weight-decay', 8e-5,
+]
+
+
+# Trying out min_scae 320 folder with augment
+x8ar_args_test = [
   '--lr-sched', '0.14,0.43,0.75,0.94',
   '--resize-sched', '0.35,0.88',
   '--epochs', 40,
@@ -216,6 +259,8 @@ def create_job(run, job_name, num_tasks):
   job.upload_async('training/dataloader.py')
   job.upload_async('training/dataloader_performance.py')
   job.upload_async('training/train_imagenet_nv.py')
+  job.upload_async('training/train_imagenet_mixup.py')
+  job.upload_async('training/adamw.py')
 
   # Sometimes get SSH session not active or "connection reset by peer"
   # bad internet?
@@ -262,7 +307,7 @@ def start_training(job, params, save_tag):
   task_cmds = []
   for i,t in enumerate(job.tasks):
     dist_args = f'--nproc_per_node={num_gpus} --nnodes={num_tasks} --node_rank={i} --master_addr={world_0_ip} --master_port={port}'
-    cmd = f'{nccl_args} python -m torch.distributed.launch {dist_args} train_imagenet_nv.py {training_args}'
+    cmd = f'{nccl_args} python -m torch.distributed.launch {dist_args} train_imagenet_mixup.py {training_args}'
     t.run(f'echo {cmd} > {save_dir}/script.log')
     task_cmds.append(cmd)
 
