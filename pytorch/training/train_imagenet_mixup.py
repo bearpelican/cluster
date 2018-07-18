@@ -79,16 +79,16 @@ if args.local_rank > 0: sys.stdout = open(f'{args.save_dir}/GPU_{args.local_rank
 class DataManager():
     def __init__(self, resize_sched=[0.4, 0.92]):
         self.resize_sched = resize_sched
-        self.load_data('-sz/160', args.batch_size, 128)
+        self.load_data('-sz/160', args.batch_size, 128, mixup=True)
         
     def set_epoch(self, epoch):
         if epoch==int(args.epochs*self.resize_sched[0]+0.5):
-            self.load_data('', args.batch_size, 224)
+            self.load_data('', args.batch_size, 224, mixup=True)
             # self.load_data('-sz/320', args.batch_size, 224, min_scale=0.097, max_scale=1.21) # lower validation accuracy when enabled for some reason
             # self.load_data('-sz/320', args.batch_size, 224, min_scale=0.0968) # lower validation accuracy when enabled for some reason
             # self.load_data('-sz/320', args.batch_size, 224, min_scale=0.093, max_scale=1.15) # right terminal experiment
         if epoch==int(args.epochs*self.resize_sched[1]+0.5):
-            self.load_data('', 96, 288, min_scale=0.5, use_ar=args.val_ar)
+            self.load_data('', 128, 288, min_scale=0.5, use_ar=args.val_ar)
 
         if hasattr(self.trn_smp, 'set_epoch'): self.trn_smp.set_epoch(epoch)
         if hasattr(self.val_smp, 'set_epoch'): self.val_smp.set_epoch(epoch)
@@ -103,13 +103,14 @@ class DataManager():
         self.val_iter = iter(self.val_dl)
         return self.val_iter
         
-    def load_data(self, dir_prefix, batch_size, image_size, **kwargs):
+    def load_data(self, dir_prefix, batch_size, image_size, mixup=False, **kwargs):
+        self.mixup = mixup
         datadir = args.data+dir_prefix
         print(f'Dataset changed. \nImage size: {image_size} \nBatch size: {batch_size} \nDirectory: {datadir}')
         loaders = get_loaders(datadir, bs=batch_size, sz=image_size, workers=args.workers, distributed=args.distributed, **kwargs)
         self.trn_dl,self.val_dl,self.trn_smp,self.val_smp = loaders
         self.trn_dl = DataPrefetcher(self.trn_dl)
-        self.trn_dl = MixUpDataLoader(self.trn_dl, 0.2)
+        if mixup: self.trn_dl = MixUpDataLoader(self.trn_dl, 0.2)
         # self.trn_dl = DataPrefetcher(self.trn_dl)
         self.val_dl = DataPrefetcher(self.val_dl, prefetch=False)
         self.trn_len = len(self.trn_dl)
@@ -304,6 +305,7 @@ def main():
     for epoch in range(args.start_epoch, args.epochs):
         estart = time.time()
         dm.set_epoch(epoch)
+        if not dm.mixup: criterion = nn.CrossEntropyLoss().cuda()
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=UserWarning)
