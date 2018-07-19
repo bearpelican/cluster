@@ -83,6 +83,7 @@ class DataManager():
         if len(batch_sched) == 1: self.batch_sched * 3
 
         self.load_data('-sz/160', self.batch_sched[0], 128)
+        # self.load_data('', self.batch_sched[1], 224)
         
     def set_epoch(self, epoch):
         if epoch==int(args.epochs*self.resize_sched[0]+0.5):
@@ -215,7 +216,7 @@ def main():
         if args.init_bn0: init_dist_weights(model) # (AS) Performs pretty poorly for first 10 epochs when enabled
         # model = nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank], output_device=args.local_rank)
         import apex_distributed
-        model = apex.DistributedDataParallel(model)
+        model = apex_distributed.DistributedDataParallel(model)
 
     global model_params, master_params
     if args.fp16:  model_params, master_params = prep_param_lists(model)
@@ -411,7 +412,7 @@ def distributed_predict(input, target, model, criterion):
         with torch.no_grad():
             # using module instead of model because DistributedDataParallel forward function has a sync point.
             # with distributed validation sampler, we don't always have data for each gpu
-            assert(isinstance(model, nn.parallel.DistributedDataParallel))
+            # assert(isinstance(model, nn.parallel.DistributedDataParallel))
             output = model.module(input) 
             loss = criterion(output, target)
         # measure accuracy and record loss

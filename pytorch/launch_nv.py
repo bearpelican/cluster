@@ -105,6 +105,17 @@ x4_args = [
   '--init-bn0',
   '--batch-sched', '192,192,128'
 ]
+
+# Current benchmark for 4x p3's - without Aspect Ratio Validatoin
+x4_args_apex = [
+  '--lr-sched', '0.14,0.47,0.78,0.95',
+  '--epochs', 6,
+  '--resize-sched', '0.33,0.66',
+  '--lr', 0.4 * 4,
+  '--init-bn0',
+  '--batch-sched', '192,192,92'
+]
+
 # Current benchmark for 4x p3's - with Aspect Ratio Validatoin
 x4ar_args = [
   '--lr-sched', '0.14,0.43,0.73,0.94',
