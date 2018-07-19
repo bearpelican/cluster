@@ -123,7 +123,7 @@ x4_args_exp2 = [
   '--lr', 0.4 * 4,
   '--init-bn0',
   '--batch-size', 192,
-  '--weight-decay', 5e-5
+  '--weight-decay', 5e-6
 ]
 
 # Experimenting with wideresnet

@@ -88,7 +88,7 @@ class DataManager():
             # self.load_data('-sz/320', args.batch_size, 224, min_scale=0.0968) # lower validation accuracy when enabled for some reason
             # self.load_data('-sz/320', args.batch_size, 224, min_scale=0.093, max_scale=1.15) # right terminal experiment
         if epoch==int(args.epochs*self.resize_sched[1]+0.5):
-            self.load_data('', 128, 288, min_scale=0.5, use_ar=args.val_ar)
+            self.load_data('', 128, 288, min_scale=0.5, use_ar=args.val_ar, mixup=True)
 
         if hasattr(self.trn_smp, 'set_epoch'): self.trn_smp.set_epoch(epoch)
         if hasattr(self.val_smp, 'set_epoch'): self.val_smp.set_epoch(epoch)
