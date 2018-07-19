@@ -213,7 +213,9 @@ def main():
     if args.fp16: model = network_to_half(model)
     if args.distributed:
         if args.init_bn0: init_dist_weights(model) # (AS) Performs pretty poorly for first 10 epochs when enabled
-        model = nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank], output_device=args.local_rank)
+        # model = nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank], output_device=args.local_rank)
+        import apex_distributed
+        model = apex.DistributedDataParallel(model)
 
     global model_params, master_params
     if args.fp16:  model_params, master_params = prep_param_lists(model)
@@ -410,7 +412,7 @@ def distributed_predict(input, target, model, criterion):
             # using module instead of model because DistributedDataParallel forward function has a sync point.
             # with distributed validation sampler, we don't always have data for each gpu
             assert(isinstance(model, nn.parallel.DistributedDataParallel))
-            output = model.module(input)
+            output = model.module(input) 
             loss = criterion(output, target)
         # measure accuracy and record loss
         valid_batches = torch.tensor([1]).cuda()

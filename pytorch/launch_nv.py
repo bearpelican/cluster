@@ -205,6 +205,7 @@ def create_job(run, job_name, num_tasks):
   job.upload_async('training/dataloader.py')
   job.upload_async('training/dataloader_performance.py')
   job.upload_async('training/train_imagenet_nv.py')
+  job.upload_async('training/apex_distributed.py')
 
   # Sometimes get SSH session not active or "connection reset by peer"
   # bad internet?
