@@ -52,6 +52,23 @@ if [ ! -d "$DATA_DIR" ]; then
     mkdir data
 fi
 
+
+
+# setting network settings - 
+# https://github.com/aws-samples/deep-learning-models/blob/5f00600ebd126410ee5a85ddc30ff2c4119681e4/hpc-cluster/prep_client.sh
+sysctl -w net.core.rmem_max=16777216
+sysctl -w net.core.wmem_max=16777216
+sysctl -w net.ipv4.tcp_rmem='4096 87380 16777216'
+sysctl -w net.ipv4.tcp_wmem='4096 65536 16777216'
+sysctl -w net.core.netdev_max_backlog=30000
+sysctl -w net.core.rmem_default=16777216
+sysctl -w net.core.wmem_default=16777216
+sysctl -w net.ipv4.tcp_mem='16777216 16777216 16777216'
+sysctl -w net.ipv4.route.flush=1
+
+
+
+# AS TODO: download from s3 if efs doesn't exist
 if [ ! -d "$DATA_DIR/imagenet" ]; then
     cd $DATA_DIR
     # cat get those files from

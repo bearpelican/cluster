@@ -22,12 +22,12 @@ def get_gpu_count(instance):
   return gpu_count[instance.instance_type]
 
 # EBS Utils
-def mount_volume_data(job, tag, offset):
+def mount_volume_data(job, tag, offset=0, dir='data'):
   for i,t in enumerate(job.tasks):
     attach_instance_ebs(t.instance, f'{tag}_{i+offset}')
-  job.run_async_join('sudo mkdir data -p')
-  job.run_async_join('sudo mount /dev/xvdf data', ignore_errors=True)
-  job.run_async_join('sudo chown `whoami` data')
+  job.run_async_join(f'sudo mkdir {dir} -p')
+  job.run_async_join(f'sudo mount /dev/xvdf {dir}', ignore_errors=True)
+  job.run_async_join(f'sudo chown `whoami` {dir}')
   
 def attach_instance_ebs(aws_instance, tag):
   ec2 = util.create_ec2_resource()
@@ -67,7 +67,8 @@ def get_ebs_settings(use_iops):
 def get_nccl_args(num_tasks, num_gpus):
   if num_tasks <= 1: return 'NCCL_DEBUG=VERSION'
   nccl_rings = get_nccl_rings(num_tasks, num_gpus)
-  return f'NCCL_RINGS="{nccl_rings}" NCCL_DEBUG=VERSION'
+  return f'NCCL_MIN_NRINGS=4 NCCL_SINGLE_RING_THRESHOLD=10 NCCL_DEBUG=VERSION'
+  # return f'NCCL_RINGS="{nccl_rings}" NCCL_DEBUG=VERSION'
 
 def get_nccl_rings(num_tasks, num_gpus):
   ring = build_ring_order(range(num_tasks), range(num_gpus))
